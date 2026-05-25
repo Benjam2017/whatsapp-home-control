@@ -1,0 +1,25 @@
+# Environment — never commit real credentials
+.env
+*.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Logs (keep the directory, not the contents)
+**/logs/*.log
+**/logs/*.log.*
+
+# OS
+.DS_Store
+Thumbs.db
