@@ -31,3 +31,6 @@ Thumbs.db
 ~$*
 
 # Third-party manuals (copyright — do not redistribute)
+
+# Internal Claude guidance — not for public repository
+CLAUDE.md
