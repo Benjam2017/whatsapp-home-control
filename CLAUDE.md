@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude when working in this repository. This file describes **what is actually here**, the conventions to follow, and the known divergences from the design documentation.
+Guidance for Claude when working in this repository. This file describes **what is actually here**, the conventions to follow, and the known divergences from the original design documentation.
 
 ---
 
@@ -44,10 +44,10 @@ The boundary is `POST /control` and `GET /health` on the FastAPI side — see `f
 ```
 whatsapp-home-control/
 ├── CLAUDE.md                  ← this file
-├── README.md                  ← VPS setup, env vars, systemd units
+├── README.md                  ← full setup guide, env vars, commands, troubleshooting
 ├── docs/
-│   └── documentation.md       ← original design doc (see §8: divergence)
-├── whatsapp_iot_requirements_v2_en_1.docx   ← original requirements
+│   ├── documentation.md       ← as-built technical reference (updated from original design)
+│   └── whatsapp_iot_requirements_v2_en_1.docx  ← original requirements document
 │
 ├── webhook/                   ← Node.js — public-facing webhook
 │   ├── app.js                 ← Express server, /webhook GET+POST, /ipx-notify, /health
@@ -58,7 +58,7 @@ whatsapp-home-control/
 │   ├── package.json
 │   ├── .env / .env.example
 │   ├── logs/
-│   └── tests/
+│   └── tests/                 ← excluded from git; run locally only
 │       ├── test_security.js   ← 12 tests
 │       └── test_state.js      ← 11 tests
 │
@@ -71,20 +71,20 @@ whatsapp-home-control/
     ├── requirements.txt
     ├── .env / .env.example
     ├── logs/
-    └── tests/
-        ├── test_commands.py   ← 19 tests
-        ├── test_ipx800.py     ← 12 tests
-        └── test_api.py        ← 14 tests
+    └── tests/                 ← excluded from git; run locally only
+        ├── test_commands.py   ← 23 tests
+        ├── test_ipx800.py     ← 9 tests
+        └── test_api.py        ← 16 tests
 ```
 
 ---
 
 ## 4. How the IPX800 is actually controlled
 
-This is the most surprising part of the codebase if you've only read `docs/documentation.md`. The doc described `/api/xdevices.json?SetR=NN`. The code uses **a different, older endpoint** that is also valid on the IPX800 V4:
+This is the most surprising part of the codebase if you've only read `docs/documentation.md`. The original design described `/api/xdevices.json?SetR=NN`. The code uses **a different, older endpoint** that is also valid on the IPX800 V4:
 
 - **Set a relay:** `GET http://<host>:8080/preset.htm?ledN=0|1&apikey=<key>` (relay numbers are 1-based: `led1`, `led2`, `led3`)
-- **Read all states:** `GET http://<host>:8080/status.xml?apikey=<key>` — returns XML with `<led0>`, `<led1>`, ... (note: status.xml is 0-indexed, while preset.htm is 1-indexed; the code handles this by subtracting 1 in `get_status_report`).
+- **Read all states:** `GET http://<host>:8080/status.xml?apikey=<key>` — returns XML with `<led0>`, `<led1>`, ... (note: `status.xml` is 0-indexed, while `preset.htm` is 1-indexed; the code handles this by subtracting 1 in `get_status_report`).
 
 If you change the endpoint, do it in **one place**: `fastapi/ipx800.py`. Don't propagate the URL string into `commands.py` or `main.py`.
 
@@ -113,13 +113,13 @@ Defined in `fastapi/commands.py`. The parser is exact-match on lowercased, trimm
 | `STATUS` | `status`, `état`, `etat`, `s`, `?` | fetch status.xml, format report |
 | `HELP` | `help`, `aide`, `h`, `commands`, `commandes` | return help text |
 
-To add a new phrase: edit the `COMMAND_MAP` dict in `commands.py` and add a test case to `tests/test_commands.py`.
+To add a new phrase: edit the `COMMAND_MAP` dict in `commands.py` and add a test case to the local `tests/test_commands.py` (not in git, but kept on disk).
 
 ---
 
 ## 6. Configuration
 
-Two `.env` files, one per service. Both are listed in `.gitignore` (or should be — if they're not, add them). The `.env.example` files are the authoritative list of every variable; if you add a new setting, update the example.
+Two `.env` files, one per service. Both are listed in `.gitignore`. The `.env.example` files are the authoritative list of every variable; if you add a new setting, update the example.
 
 ### `webhook/.env`
 - TLS cert paths (Let's Encrypt)
@@ -132,7 +132,7 @@ Two `.env` files, one per service. Both are listed in `.gitignore` (or should be
 - Relay mapping (`RELAY_LIGHT=1`, `RELAY_CURTAIN_UP=2`, `RELAY_CURTAIN_DOWN=3`)
 - Log rotation settings
 
-**Never commit a real `.env`.** Both files should be `chmod 600` on the VPS.
+**Never commit a real `.env`.** Both files should be `chmod 600` on the VPS. The `fastapi/.env` in this repo contains only safe test defaults (no real credentials).
 
 ---
 
@@ -162,7 +162,19 @@ node app.js
 ```
 
 ### Running tests
-The README claims 68 tests total. Always run both sides after changes; the contract between them lives in `webhook/app.js::callFastAPI` ↔ `fastapi/main.py::control`.
+
+71 tests total. The `tests/` directories are **excluded from the git repository** (`.gitignore` contains `**/tests/`) but are kept on disk for local development.
+
+| Service | File | Count |
+|---------|------|-------|
+| FastAPI | `test_commands.py` | 23 |
+| FastAPI | `test_ipx800.py` | 9 |
+| FastAPI | `test_api.py` | 16 |
+| Node.js | `test_security.js` | 12 |
+| Node.js | `test_state.js` | 11 |
+| **Total** | | **71** |
+
+Always run both sides after changes; the contract between them lives in `webhook/app.js::callFastAPI` ↔ `fastapi/main.py::control`.
 
 ### Conventions to follow
 
@@ -173,33 +185,33 @@ The README claims 68 tests total. Always run both sides after changes; the contr
 
 ### What NOT to do without checking
 
-- Don't switch the IPX800 endpoint to `/api/xdevices.json` without confirming the device firmware supports it *and* updating `ipx800.py`, `test_ipx800.py`, and `docs/documentation.md`. The current `/preset.htm` + `/status.xml` pair is older but verified working on this hardware.
+- Don't switch the IPX800 endpoint to `/api/xdevices.json` without confirming the device firmware supports it *and* updating `ipx800.py` and `docs/documentation.md`. The current `/preset.htm` + `/status.xml` pair is older but verified working on this hardware.
 - Don't remove the interlock delay or the opposite-relay-off ops from curtain actions.
 - Don't merge the two services. The split is intentional (see §2).
 - Don't add LLM-based command parsing. The keyword map is the right tool for a fixed vocabulary; an LLM would add latency, cost, and a new failure mode for no benefit.
 
 ---
 
-## 8. Divergence from `docs/documentation.md`
+## 8. Divergence from the original design
 
-`docs/documentation.md` was written as a forward-looking design before the code was built. The implementation diverged on several points. **The code is the source of truth.** Treat the doc as historical context, not as a spec.
+The original design (`docs/documentation.md` was initially a forward-looking design document) diverged from the implementation on several points. The design doc has since been updated to match the as-built state. The key divergences that shaped the code are recorded here for context:
 
-| Topic | Doc says | Code does |
+| Topic | Original design | As built |
 |---|---|---|
-| LAN-to-VPS link | Cloudflare Tunnel from LAN to VPS | DDNS + port-forward on the LAN side; IPX800 reached at `http://<ddns>:8080` |
-| Webhook framework | FastAPI handles the Meta webhook directly | Node.js handles Meta; FastAPI is internal |
+| LAN-to-VPS link | Cloudflare Tunnel (`cloudflared`) | DDNS + port-forward; IPX800 reached at `http://<ddns>:8080` |
+| Webhook framework | FastAPI handles Meta webhook directly | Node.js handles Meta; FastAPI is internal only |
 | IPX800 endpoint | `/api/xdevices.json?SetR=NN&ClearR=NN` | `/preset.htm?ledN=0\|1` and `/status.xml` |
 | Curtain hardware | X-4VR extension (firmware interlock) | Two raw relays with software interlock |
-| Languages | English only, FR/ZH "optional Phase 3" | EN + FR already implemented |
-| Push from device → user | Not mentioned | Implemented at `GET /ipx-notify` in `webhook/app.js` |
+| Languages | English only; FR/ZH "optional Phase 3" | EN + FR already implemented |
+| Push from device → user | Not in original design | Implemented at `GET /ipx-notify` in `webhook/app.js` |
 
-If you reconcile the doc with the code later, update `docs/documentation.md` to match the code — not the other way around.
+**The code is the source of truth.** When `docs/documentation.md` and the code conflict, the code wins.
 
 ---
 
 ## 9. Deployment notes
 
-The README has the canonical setup. Two systemd units:
+The README has the canonical VPS setup. Two systemd units:
 - `home-fastapi.service` — runs `uvicorn main:app --host 127.0.0.1 --port 8000`
 - `home-webhook.service` — runs `node app.js` (HTTPS :443), depends on `home-fastapi.service`
 
@@ -211,7 +223,7 @@ If you change a port or path, update **all three**: the `.env`, the systemd unit
 
 ## 10. Open items
 
-- The `.env` files currently in the repo: confirm they don't contain real secrets before any commit. If they do, rotate and move to a secret manager.
-- No CI yet. The test suite exists but nothing runs it automatically.
-- No structured (JSON) logs. Both loggers produce human-readable lines, which is fine for a single-VPS demo but should be revisited if this grows.
+- No CI yet. The test suite exists locally (71 tests, not shipped in the repository) but nothing runs it automatically.
+- No structured (JSON) logs. Both loggers produce human-readable lines, which is fine for a single-VPS deployment but should be revisited if this grows.
 - `state.js` is in-memory only. After a Node restart, `getStatusReport` returns `UNKNOWN` until the next `/ipx-notify` push or a `status` command (which proxies through FastAPI to the IPX800 anyway).
+- The `fastapi/.env` in the repository contains safe test defaults only. The production `.env` on the VPS must be created separately and must never be committed.
