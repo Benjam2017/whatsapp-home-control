@@ -2,6 +2,9 @@
 .env
 *.env
 
+# Tests (run locally, not shipped in the repository)
+**/tests/
+
 # Python
 venv/
 __pycache__/
@@ -23,3 +26,9 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Office temp/lock files
+~$*
+
+# Third-party manuals (copyright — do not redistribute)
+docs/*.pdf
