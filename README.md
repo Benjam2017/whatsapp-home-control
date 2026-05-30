@@ -45,7 +45,7 @@ Meta Cloud API  ──►  webhook/ (Node.js, HTTPS :443, your VPS)
                          │ applies curtain interlock
                          │ GET /preset.htm
                          ▼
-                     IPX800 V4  (on your home LAN, via DDNS + port forward)
+                     IPX800 V4  (same LAN as VPS, direct local IP)
                          │
                          │ physical switch toggled by someone at home
                          ▼
@@ -80,13 +80,12 @@ Keeping them separate means you can upgrade or replace either side without touch
 - Linux VPS with a **static public IP address** (tested on Ubuntu 22.04)
 - A **registered domain name** pointing to that IP (A record)
 - **TLS certificate** from Let's Encrypt (free) — see [Certbot](https://certbot.eff.org/)
-- Open ports: 443 (HTTPS inbound), 8080 optional outbound to home router
+- Open ports: 443 (HTTPS inbound)
 
-### Home LAN
-- **GCE Electronics IPX800 V4** relay controller
-- **DDNS hostname** (e.g. DuckDNS, No-IP) pointing to your home router's WAN IP
-- **Port forwarding** on your router: external TCP 8080 → IPX800 LAN IP port 80 (or the port IPX800 uses)
+### Home LAN / Local network
+- **GCE Electronics IPX800 V4** relay controller on the **same LAN** as the VPS
 - IPX800 API key configured (IPX800 web interface → Settings → API)
+- The VPS reaches the IPX800 directly by its local IP — no DDNS or port forwarding needed
 
 ### Software (VPS)
 - **Node.js 18+** — `node --version`
@@ -216,8 +215,8 @@ curl http://127.0.0.1:8000/health
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `IPX800_HOST` | `myhome.duckdns.org` | DDNS hostname of your home router |
-| `IPX800_PORT` | `8080` | External port forwarded to the IPX800 |
+| `IPX800_HOST` | `192.168.1.100` | Local IP address of the IPX800 on the shared LAN |
+| `IPX800_PORT` | `80` | IPX800 HTTP port (default 80) |
 | `IPX800_APIKEY` | `your-apikey` | IPX800 API key (set in IPX800 web interface) |
 | `IPX800_TIMEOUT` | `5.0` | HTTP request timeout in seconds |
 | `IPX800_RETRY` | `3` | Retry attempts on connection failure |
@@ -292,18 +291,22 @@ Default mapping in `.env.example`:
 
 If your wiring differs, update `RELAY_LIGHT`, `RELAY_CURTAIN_UP`, `RELAY_CURTAIN_DOWN` accordingly.
 
-### 8.4 Set up DDNS + port forwarding
+### 8.4 Verify IPX800 connectivity
 
-1. Create a free DDNS hostname (e.g. [DuckDNS](https://www.duckdns.org/)) and install the DDNS updater client on your router or a home computer.
-2. On your home router: **Port Forwarding** → add rule: external TCP port `8080` → IPX800 LAN IP, port `80`.
-3. Test from your VPS: `curl http://myhome.duckdns.org:8080/status.xml?apikey=<key>`
+Since the VPS and IPX800 are on the same LAN, no DDNS or port forwarding is needed.
+Set `IPX800_HOST` in `fastapi/.env` to the IPX800's local IP address (find it in your router's DHCP table or the IPX800 web interface).
+
+Test direct connectivity from the VPS:
+```bash
+curl "http://192.168.1.100:80/status.xml?apikey=<key>"
+```
 
 ### 8.5 Verify connectivity
 
 ```bash
 curl "http://127.0.0.1:8000/health"
 # "ipx800": "reachable"  ← success
-# "ipx800": "unreachable" ← check DDNS / port forward / API key
+# "ipx800": "unreachable" ← check IPX800 local IP, port, and API key
 ```
 
 ---
@@ -453,8 +456,8 @@ curl http://127.0.0.1:8000/health
   "status": "ok",
   "service": "fastapi-control",
   "ipx800": "reachable",
-  "ipx800_host": "myhome.duckdns.org",
-  "ipx800_port": 8080
+  "ipx800_host": "192.168.1.100",
+  "ipx800_port": 80
 }
 ```
 `status` is `"degraded"` when the IPX800 is unreachable.
@@ -536,8 +539,8 @@ sudo journalctl -u home-webhook -n 100
 
 1. Check the FastAPI log for the parsed command and any IPX800 errors.
 2. Run: `curl http://127.0.0.1:8000/health` — is `ipx800` reachable?
-3. Test DDNS resolution from the VPS: `curl "http://myhome.duckdns.org:8080/status.xml?apikey=<key>"`
-4. Check your router's port forwarding rule (external 8080 → IPX800 LAN IP:80).
+3. Test direct LAN connectivity: `curl "http://<IPX800-local-ip>:80/status.xml?apikey=<key>"`
+4. Verify `IPX800_HOST` and `IPX800_PORT` in `fastapi/.env` match the IPX800's actual LAN address.
 
 ### "Unknown command" reply
 

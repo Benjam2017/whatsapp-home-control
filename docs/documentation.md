@@ -65,7 +65,7 @@ fastapi/ service  (Python, FastAPI, HTTP :8000, loopback only)
     │  apply curtain interlock
     │  HTTP GET /preset.htm  (set relay)
     ▼
-IPX800 V4  (home LAN, reached via DDNS hostname + port forwarding)
+IPX800 V4  (same LAN as VPS, reached via local IP)
 ```
 
 **Physical switch push flow (reverse direction)**
@@ -93,16 +93,14 @@ Keeping them separate means either can be upgraded, replaced, or restarted witho
 ### Network topology
 
 ```
-VPS (public IP, domain with TLS)
-├── :443  Node.js webhook  ← public, Meta-facing
-└── :8000 Python FastAPI   ← loopback only, not publicly accessible
-
-Home LAN
-└── IPX800 V4  ← reached from VPS at http://<ddns>:8080
-    (LAN router: external TCP 8080 → IPX800 LAN IP:80)
+LAN (VPS and IPX800 on the same network)
+├── VPS (public IP, domain with TLS)
+│   ├── :443  Node.js webhook  ← public, Meta-facing
+│   └── :8000 Python FastAPI   ← loopback only, not publicly accessible
+└── IPX800 V4  ← reached directly at http://<local-ip>:80
 ```
 
-The IPX800 is **not** directly on the public internet. The VPS initiates outbound connections to the DDNS hostname; the home router port-forwards to the device.
+The VPS and IPX800 are on the same LAN. FastAPI connects to the IPX800 by its local IP address — no DDNS, no router port-forwarding needed.
 
 ---
 
@@ -113,7 +111,7 @@ The implementation uses two IPX800 HTTP endpoints. These are the older "LED pres
 ### Set a relay state
 
 ```
-GET http://<ddns>:<port>/preset.htm?led<N>=<state>&apikey=<key>
+GET http://<local-ip>:<port>/preset.htm?led<N>=<state>&apikey=<key>
 ```
 
 - `N` is the **1-based** relay number (`led1`, `led2`, `led3`, …)
@@ -122,18 +120,18 @@ GET http://<ddns>:<port>/preset.htm?led<N>=<state>&apikey=<key>
 
 **Example — turn relay 1 ON:**
 ```
-GET http://myhome.duckdns.org:8080/preset.htm?led1=1&apikey=mysecretkey
+GET http://192.168.1.100:80/preset.htm?led1=1&apikey=mysecretkey
 ```
 
 **Example — turn relay 2 OFF:**
 ```
-GET http://myhome.duckdns.org:8080/preset.htm?led2=0&apikey=mysecretkey
+GET http://192.168.1.100:80/preset.htm?led2=0&apikey=mysecretkey
 ```
 
 ### Read all relay states
 
 ```
-GET http://<ddns>:<port>/status.xml?apikey=<key>
+GET http://<local-ip>:<port>/status.xml?apikey=<key>
 ```
 
 Returns XML. Relay tags are **0-based** (`<led0>`, `<led1>`, `<led2>`, …), values are `"0"` or `"1"`.
@@ -253,7 +251,7 @@ Every curtain direction command (`CURTAIN_UP`, `CURTAIN_DOWN`) is represented as
 | Replay protection | `webhook/security.js` | In-memory dedup of last 200 message IDs; prevents double-execution on Meta webhook retries |
 | Internal isolation | VPS network | FastAPI listens on `127.0.0.1:8000` only — no public exposure, no authentication needed on internal calls |
 | Secrets management | `.gitignore` | Both `.env` files excluded from git; `chmod 600` on the VPS |
-| Device protection | Home router | IPX800 not directly internet-facing; reached via outbound DDNS connection from VPS |
+| Device protection | LAN isolation | IPX800 not internet-facing; reachable only within the LAN shared with the VPS |
 
 ### HMAC verification detail
 
@@ -333,7 +331,7 @@ The Node.js service calls this to execute a command.
 On failure (IPX800 unreachable):
 ```json
 {
-  "reply": "❌ Control failed: IPX800 unreachable after 3 attempts. Check DDNS (...)",
+  "reply": "❌ Control failed: IPX800 unreachable after 3 attempts. Check local IP and API key.",
   "success": false,
   "action": "LIGHT_ON"
 }
@@ -351,8 +349,8 @@ Returns service status plus IPX800 reachability.
   "status": "ok",
   "service": "fastapi-control",
   "ipx800": "reachable",
-  "ipx800_host": "myhome.duckdns.org",
-  "ipx800_port": 8080
+  "ipx800_host": "192.168.1.100",
+  "ipx800_port": 80
 }
 ```
 
@@ -362,8 +360,8 @@ Returns service status plus IPX800 reachability.
   "status": "degraded",
   "service": "fastapi-control",
   "ipx800": "unreachable",
-  "ipx800_host": "myhome.duckdns.org",
-  "ipx800_port": 8080
+  "ipx800_host": "192.168.1.100",
+  "ipx800_port": 80
 }
 ```
 
@@ -375,8 +373,8 @@ Returns service status plus IPX800 reachability.
 
 | Variable | Default in `.env.example` | Description |
 |----------|--------------------------|-------------|
-| `IPX800_HOST` | `myhome.duckdns.org` | DDNS hostname pointing to home router |
-| `IPX800_PORT` | `8080` | External port forwarded to IPX800 (router config) |
+| `IPX800_HOST` | `192.168.1.100` | Local IP address of the IPX800 on the shared LAN |
+| `IPX800_PORT` | `80` | IPX800 HTTP port (default 80) |
 | `IPX800_APIKEY` | `your-ipx800-apikey-here` | API key set in IPX800 web interface |
 | `IPX800_TIMEOUT` | `5.0` | HTTP timeout in seconds per attempt |
 | `IPX800_RETRY` | `3` | Number of retry attempts before giving up |
@@ -432,12 +430,9 @@ The keyword map (`COMMAND_MAP` in `commands.py`) is the right tool for a fixed v
 
 The keyword map is deterministic, zero-latency, zero-cost, and testable. For a vocabulary that fits in one screen, this is the correct choice.
 
-### DDNS + port-forward instead of Cloudflare Tunnel
+### Direct LAN instead of Cloudflare Tunnel
 
-The original design specified a Cloudflare Tunnel. The as-built implementation uses DDNS + router port-forwarding because:
-- It requires no third-party account or cloud dependency for the control path
-- The home router already performs DDNS updates (DuckDNS)
-- The IPX800 API key provides authentication; the device is not directly internet-exposed at the OS level (only the HTTP API port is forwarded)
+The original design specified a Cloudflare Tunnel. The as-built deployment has the VPS and IPX800 on the same LAN, so the VPS reaches the IPX800 directly by local IP address — no tunnel, no DDNS, no router port-forwarding needed. The IPX800 API key provides authentication; the device is not internet-facing.
 
 ---
 
@@ -447,7 +442,7 @@ The original design document was written before implementation and proposed seve
 
 | Topic | Original design | As built | Reason for change |
 |-------|-----------------|----------|-------------------|
-| LAN-to-VPS link | Cloudflare Tunnel (`cloudflared`) | DDNS + port-forward | Simpler; no Cloudflare account needed; router already runs DDNS |
+| LAN-to-VPS link | Cloudflare Tunnel (`cloudflared`) | Direct LAN (VPS and IPX800 on same network) | Simpler; no tunnel or DDNS needed when both devices share the LAN |
 | Webhook framework | FastAPI handles Meta webhook directly (single service) | Node.js for Meta, FastAPI for device (two services) | Separation of concerns; each service is replaceable |
 | TLS termination | Nginx reverse proxy | Node.js native HTTPS | One less component for a single-endpoint VPS |
 | IPX800 endpoint | `/api/xdevices.json?SetR=NN&ClearR=NN` | `/preset.htm?ledN=0\|1` and `/status.xml` | Verified working on the actual device firmware |
