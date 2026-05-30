@@ -215,7 +215,7 @@ curl http://127.0.0.1:8000/health
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `IPX800_HOST` | `192.168.1.100` | Local IP address of the IPX800 on the shared LAN |
+| `IPX800_HOST` | `<IPX800-LAN-IP>` | Local IP address of the IPX800 on the shared LAN |
 | `IPX800_PORT` | `80` | IPX800 HTTP port (default 80) |
 | `IPX800_APIKEY` | `your-apikey` | IPX800 API key (set in IPX800 web interface) |
 | `IPX800_TIMEOUT` | `5.0` | HTTP request timeout in seconds |
@@ -298,7 +298,7 @@ Set `IPX800_HOST` in `fastapi/.env` to the IPX800's local IP address (find it in
 
 Test direct connectivity from the VPS:
 ```bash
-curl "http://192.168.1.100:80/status.xml?apikey=<key>"
+curl "http://<IPX800-LAN-IP>:80/status.xml?apikey=<key>"
 ```
 
 ### 8.5 Verify connectivity
@@ -456,7 +456,7 @@ curl http://127.0.0.1:8000/health
   "status": "ok",
   "service": "fastapi-control",
   "ipx800": "reachable",
-  "ipx800_host": "192.168.1.100",
+  "ipx800_host": "<IPX800-LAN-IP>",
   "ipx800_port": 80
 }
 ```
@@ -539,7 +539,7 @@ sudo journalctl -u home-webhook -n 100
 
 1. Check the FastAPI log for the parsed command and any IPX800 errors.
 2. Run: `curl http://127.0.0.1:8000/health` — is `ipx800` reachable?
-3. Test direct LAN connectivity: `curl "http://<IPX800-local-ip>:80/status.xml?apikey=<key>"`
+3. Test direct LAN connectivity: `curl "http://<IPX800-LAN-IP>:80/status.xml?apikey=<key>"`
 4. Verify `IPX800_HOST` and `IPX800_PORT` in `fastapi/.env` match the IPX800's actual LAN address.
 
 ### "Unknown command" reply

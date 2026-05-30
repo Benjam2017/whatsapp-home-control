@@ -132,7 +132,7 @@ The only contract between them is `POST /control` (send a command) and `GET /hea
         → relay_ops = [ { relay: 1, state: 1 } ]
 
 7.  FastAPI / ipx800.py — IPX800Controller.execute()
-        → GET http://192.168.1.100:80/preset.htm?led1=1&apikey=<key>
+        → GET http://<IPX800-LAN-IP>:80/preset.htm?led1=1&apikey=<key>
           (retries up to 3× with a 10 s gap on failure)
 
 8.  IPX800 toggles relay 1 → light turns ON
@@ -189,7 +189,7 @@ Supported `device` values: `light` · `curtain_up` · `curtain_down`
 ```
 1.  User sends "status"
 2.  POST /control  { "command": "status" }
-3.  FastAPI → GET http://<local-ip>:80/status.xml?apikey=<key>
+3.  FastAPI → GET http://<IPX800-LAN-IP>:80/status.xml?apikey=<key>
 4.  IPX800 returns XML:
         <response>
             <led0>1</led0>   ← relay 1 (light),        0-based index
@@ -262,7 +262,7 @@ Any unrecognised text returns: `❓ Unknown command. Send *help* to see availabl
 
 | Variable | Example | Description |
 |---|---|---|
-| `IPX800_HOST` | `192.168.1.100` | Local IP address of the IPX800 on the shared LAN |
+| `IPX800_HOST` | `<IPX800-LAN-IP>` | Local IP address of the IPX800 on the shared LAN |
 | `IPX800_PORT` | `80` | IPX800 HTTP port (default 80) |
 | `IPX800_APIKEY` | `your-apikey` | IPX800 API key (set in IPX800 web UI) |
 | `IPX800_TIMEOUT` | `5.0` | HTTP request timeout in seconds |
@@ -313,7 +313,7 @@ Expected (IPX800 reachable):
   "status": "ok",
   "service": "fastapi-control",
   "ipx800": "reachable",
-  "ipx800_host": "192.168.1.100",
+  "ipx800_host": "<IPX800-LAN-IP>",
   "ipx800_port": 80
 }
 ```
@@ -340,7 +340,7 @@ Expected:
 ### Step 3 — IPX800 direct connectivity (from VPS)
 
 ```bash
-curl "http://192.168.1.100:80/status.xml?apikey=<your-key>"
+curl "http://<IPX800-LAN-IP>:80/status.xml?apikey=<your-key>"
 ```
 
 Expected: XML with `<led0>`, `<led1>`, etc. Any HTTP error or timeout means the local IP, port, or API key is wrong.

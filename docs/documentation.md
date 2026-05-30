@@ -120,12 +120,12 @@ GET http://<local-ip>:<port>/preset.htm?led<N>=<state>&apikey=<key>
 
 **Example — turn relay 1 ON:**
 ```
-GET http://192.168.1.100:80/preset.htm?led1=1&apikey=mysecretkey
+GET http://<IPX800-LAN-IP>:80/preset.htm?led1=1&apikey=mysecretkey
 ```
 
 **Example — turn relay 2 OFF:**
 ```
-GET http://192.168.1.100:80/preset.htm?led2=0&apikey=mysecretkey
+GET http://<IPX800-LAN-IP>:80/preset.htm?led2=0&apikey=mysecretkey
 ```
 
 ### Read all relay states
@@ -349,7 +349,7 @@ Returns service status plus IPX800 reachability.
   "status": "ok",
   "service": "fastapi-control",
   "ipx800": "reachable",
-  "ipx800_host": "192.168.1.100",
+  "ipx800_host": "<IPX800-LAN-IP>",
   "ipx800_port": 80
 }
 ```
@@ -360,7 +360,7 @@ Returns service status plus IPX800 reachability.
   "status": "degraded",
   "service": "fastapi-control",
   "ipx800": "unreachable",
-  "ipx800_host": "192.168.1.100",
+  "ipx800_host": "<IPX800-LAN-IP>",
   "ipx800_port": 80
 }
 ```
@@ -373,7 +373,7 @@ Returns service status plus IPX800 reachability.
 
 | Variable | Default in `.env.example` | Description |
 |----------|--------------------------|-------------|
-| `IPX800_HOST` | `192.168.1.100` | Local IP address of the IPX800 on the shared LAN |
+| `IPX800_HOST` | `<IPX800-LAN-IP>` | Local IP address of the IPX800 on the shared LAN |
 | `IPX800_PORT` | `80` | IPX800 HTTP port (default 80) |
 | `IPX800_APIKEY` | `your-ipx800-apikey-here` | API key set in IPX800 web interface |
 | `IPX800_TIMEOUT` | `5.0` | HTTP timeout in seconds per attempt |
